@@ -92,20 +92,50 @@ const quizzes = {
 };
 
 function App() {
-  const [quizType, setQuizType] = useState(null);
-  const [startQuiz, setStartQuiz] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(300);
+  const [quizType, setQuizType] = useState(localStorage.getItem("quizType") || null);
+  const [startQuiz, setStartQuiz] = useState(localStorage.getItem("startQuiz") === "true");
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(
+    parseInt(localStorage.getItem("currentQuestionIndex")) || 0
+  );
+  const [score, setScore] = useState(parseInt(localStorage.getItem("score")) || 0);
+  const [timeLeft, setTimeLeft] = useState(parseInt(localStorage.getItem("timeLeft")) || 300);
   const [quizFinished, setQuizFinished] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
 
   const handleQuizSelect = (type) => {
     setQuizType(type);
+    localStorage.setItem("quizType", type);
   };
 
   const handleStartQuiz = () => {
     setStartQuiz(true);
+    localStorage.setItem("startQuiz", true);
+  };
+
+  const handleCloseQuiz = () => {
+    const confirmClose = window.confirm(
+      "Are you sure you want to close? Your test will be Lost."
+    );
+    if (confirmClose) {
+      // Reset all states and navigate to the quiz selection page
+      resetQuiz();
+    }
+  };
+
+  const resetQuiz = () => {
+    setQuizType(null);
+    setStartQuiz(false);
+    setCurrentQuestionIndex(0);
+    setScore(0);
+    setTimeLeft(300);
+    setQuizFinished(false);
+
+    // Clear local storage for a fresh start
+    localStorage.clear();
+  };
+
+  const handleRestartQuiz = () => {
+    resetQuiz();
   };
 
   const currentQuiz = quizType ? quizzes[quizType] : [];
@@ -113,7 +143,11 @@ function App() {
   useEffect(() => {
     if (startQuiz) {
       const timer = setInterval(() => {
-        setTimeLeft((prevTime) => (prevTime > 0 ? prevTime - 1 : 0));
+        setTimeLeft((prevTime) => {
+          const updatedTime = prevTime > 0 ? prevTime - 1 : 0;
+          localStorage.setItem("timeLeft", updatedTime);
+          return updatedTime;
+        });
       }, 1000);
 
       if (timeLeft === 0) {
@@ -123,6 +157,12 @@ function App() {
       return () => clearInterval(timer);
     }
   }, [timeLeft, startQuiz]);
+
+  useEffect(() => {
+    // Save progress to localStorage
+    localStorage.setItem("currentQuestionIndex", currentQuestionIndex);
+    localStorage.setItem("score", score);
+  }, [currentQuestionIndex, score]);
 
   const handleAnswerClick = (index) => {
     setSelectedAnswer(index);
@@ -142,61 +182,77 @@ function App() {
   };
 
   return (
-    <div className="App">
-      {!startQuiz ? (
-        <div>
-          <h1>Quiz App</h1>
-          <div className="quiz-selection">
-            <h2>Select a quiz</h2>
-            <div className="quiz-options">
-              <button onClick={() => handleQuizSelect('HTML')}>HTML</button>
-              <button onClick={() => handleQuizSelect('CSS')}>CSS</button>
-              <button onClick={() => handleQuizSelect('JavaScript')}>JavaScript</button>
-              <button onClick={() => handleQuizSelect('React')}>React</button>
-            </div>
+  <div className="App">
+    {!startQuiz ? (
+      <div>
+        <h1>Quiz App</h1>
+        <div className="quiz-selection">
+          <h2>Select a quiz</h2>
+          <div className="quiz-options">
+            <button onClick={() => handleQuizSelect("HTML")}>HTML</button>
+            <button onClick={() => handleQuizSelect("CSS")}>CSS</button>
+            <button onClick={() => handleQuizSelect("JavaScript")}>JavaScript</button>
+            <button onClick={() => handleQuizSelect("React")}>React</button>
           </div>
-          {quizType && (
-            <button className="start-btn" onClick={handleStartQuiz}>
-              Start {quizType} Quiz
+        </div>
+        {quizType && (
+          <button className="start-btn" onClick={handleStartQuiz}>
+            Start {quizType} Quiz
+          </button>
+        )}
+      </div>
+    ) : (
+      <div className="quiz-container">
+        {!quizFinished && (
+          <button className="close-btn" onClick={handleCloseQuiz}>
+            ✖
+          </button>
+        )}
+        {quizFinished ? (
+          <div className="result">
+            <h2>Quiz Finished</h2>
+            <p>
+              Your score is: {score}/{currentQuiz.length}
+            </p>
+            <button className="restart-btn" onClick={handleRestartQuiz}>
+              Restart the Test
             </button>
-          )}
-        </div>
-      ) : (
-        <div className="quiz-container">
-          {quizFinished ? (
-            <div className="result">
-              <h2>Quiz Finished</h2>
-              <p>Your score is: {score}/{currentQuiz.length}</p>
+          </div>
+        ) : (
+          <div className="question-container">
+            <h2>{quizType} Quiz</h2>
+            <p>
+              Time left: {Math.floor(timeLeft / 60)}:
+              {timeLeft % 60 < 10 ? `0${timeLeft % 60}` : timeLeft % 60}
+            </p>
+            <h4>
+              Question {currentQuestionIndex + 1} of {currentQuiz.length}
+            </h4>
+            <h3>{currentQuiz[currentQuestionIndex]?.question}</h3>
+            <div className="options">
+              {currentQuiz[currentQuestionIndex]?.options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleAnswerClick(index)}
+                  className={selectedAnswer === index ? "selected" : ""}
+                >
+                  {option}
+                </button>
+              ))}
             </div>
-          ) : (
-            <div className="question-container">
-              <h2>{quizType} Quiz</h2>
-              <p>Time left: {Math.floor(timeLeft / 60)}:{timeLeft % 60 < 10 ? `0${timeLeft % 60}` : timeLeft % 60}</p>
-              <h3>{currentQuiz[currentQuestionIndex]?.question}</h3>
-              <div className="options">
-                {currentQuiz[currentQuestionIndex]?.options.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleAnswerClick(index)}
-                    className={selectedAnswer === index ? 'selected' : ''}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="next-btn"
-                onClick={handleNextQuestion}
-                disabled={selectedAnswer === null}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
+            <button
+              className="next-btn"
+              onClick={handleNextQuestion}
+              disabled={selectedAnswer === null}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+);
 }
 
 export default App;
